@@ -1,4 +1,3 @@
-import { CogIcon } from "@heroicons/react/20/solid";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { CoinProps } from "../home/home";

@@ -1,5 +1,5 @@
 import { HomeIcon } from "@heroicons/react/16/solid";
-import { Currency, SearchIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import { useState, FormEvent, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -20,6 +20,7 @@ export interface CoinProps {
   formatedMarket: string;
   formatedVolume: string;
 }
+
 interface DataProps {
   data: CoinProps[];
 }
@@ -29,6 +30,7 @@ export function Home() {
   const [coins, setCoins] = useState<CoinProps[]>([]);
   const navigate = useNavigate();
   const [offset, setOffset] = useState(0);
+  const [isLoading, setIsLoading] = useState(false); // Opcional: Estado para carregar mais
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,50 +39,53 @@ export function Home() {
   }
 
   function handleLoad() {
-    if (offset === 0) {
-      setOffset(10);
-      return;
-    }
-    setOffset(offset + 10);
+    setOffset((prevOffset) => prevOffset + 10);
   }
 
   useEffect(() => {
     getData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset]);
 
   async function getData() {
-    const limit = offset === 0 ? 10 : 10; // Only fetch 10 on the first request
-    fetch(`https://api.coincap.io/v2/assets?limit=${limit}&offset=${offset}`)
+    setIsLoading(true);
+    const limit = 10; // Sempre buscar 10 itens por vez
+    try {
+      const response = await fetch(`https://api.coincap.io/v2/assets?limit=${limit}&offset=${offset}`);
+      const data: DataProps = await response.json();
+      const coinsData = data.data;
 
-      .then((response) => response.json())
-      .then((data) => {
-        const coinsData = data.data;
-        const price = Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
-        });
-        const priceCompact = Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
-          notation: "compact",
-        });
-        const formatedResult = coinsData.map((item: any) => ({
-          ...item,
-          formatedPrice: price.format(Number(item.priceUsd)),
-          formatedMarket: priceCompact.format(Number(item.marketCapUsd)),
-          formatedVolume: priceCompact.format(Number(item.volumeUsd24Hr)),
-        }));
+      const price = Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      });
+      const priceCompact = Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        notation: "compact",
+      });
+      const formatedResult = coinsData.map((item: CoinProps) => ({
+        ...item,
+        formatedPrice: price.format(Number(item.priceUsd)),
+        formatedMarket: priceCompact.format(Number(item.marketCapUsd)),
+        formatedVolume: priceCompact.format(Number(item.volumeUsd24Hr)),
+      }));
 
-        setCoins((prevCoins) => [...prevCoins, ...formatedResult]);
-    });
-}
+      setCoins((prevCoins) => [...prevCoins, ...formatedResult]);
+    } catch (error) {
+      console.error("Erro ao buscar dados:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   // Filtro dinâmico para as moedas
   const filteredCoins = coins.filter(
     (coin) =>
-      coin.name.toLowerCase().includes(input.toLowerCase())
-      
+      coin.name.toLowerCase().includes(input.toLowerCase()) ||
+      coin.symbol.toLowerCase().includes(input.toLowerCase())
   );
+
   return (
     <main className="w-full max-w-6xl mx-auto my-8 p-3">
       {/* TÍTULO */}
@@ -119,9 +124,9 @@ export function Home() {
           </thead>
           <tbody>
             {filteredCoins.length > 0 ? (
-              filteredCoins.map((coin, index) => (
+              filteredCoins.map((coin) => (
                 <tr
-                  key={index}
+                  key={coin.id}
                   className="border-t border-zinc-700 transition-colors hover:bg-zinc-700/60 flex flex-col md:table-row"
                 >
                   <td
@@ -147,9 +152,7 @@ export function Home() {
                     className="px-4 py-3 flex justify-between items-center md:table-cell"
                     data-label="Valor de mercado"
                   >
-                    <span className="md:hidden font-medium">
-                      Valor de mercado:
-                    </span>
+                    <span className="md:hidden font-medium">Valor de mercado:</span>
                     {coin.formatedMarket}
                   </td>
                   <td
@@ -190,12 +193,13 @@ export function Home() {
             )}
           </tbody>
         </table>
-        <div className="my-8">
+        <div className="my-8 flex justify-center">
           <button
             className="px-4 py-2 bg-yellow-400 text-zinc-900 font-bold rounded-lg shadow-xl transition-shadow duration-300 hover:bg-yellow-500"
             onClick={handleLoad}
+            disabled={isLoading} // Opcional: Desabilitar botão enquanto carrega
           >
-            Carregar mais...
+            {isLoading ? "Carregando..." : "Carregar mais..."}
           </button>
         </div>
       </div>
